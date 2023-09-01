@@ -73,9 +73,6 @@ def load(
         legacy_step: Whether to use the legacy step function.
         task_kwargs: Additional keyword arguments to pass to the task.
     """
-
-    #if curriculum is not None: 
-    #    midi = None
     if midi_file is not None:
         midi = music.load(midi_file, stretch=stretch, shift=shift)
     else:
