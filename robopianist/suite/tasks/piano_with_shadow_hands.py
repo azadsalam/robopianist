@@ -49,6 +49,7 @@ class PianoWithShadowHands(base.PianoTask):
     def __init__(
         self,
         midi: midi_file.MidiFile,
+        callback = None, 
         n_steps_lookahead: int = 1,
         n_seconds_lookahead: Optional[float] = None,
         trim_silence: bool = False,
@@ -67,6 +68,8 @@ class PianoWithShadowHands(base.PianoTask):
 
         Args:
             midi: A `MidiFile` object.
+            callback: A CallBack object. Currently used for curriculum learning. callback.get_midi() resets the midi
+                according to the callback object i.e., curriculum
             n_steps_lookahead: Number of timesteps to look ahead when computing the
                 goal state.
             n_seconds_lookahead: Number of seconds to look ahead when computing the
@@ -97,6 +100,7 @@ class PianoWithShadowHands(base.PianoTask):
 
         self._midi = midi
         self._initial_midi = midi
+        self.callback = callback
         self._n_steps_lookahead = n_steps_lookahead
         if n_seconds_lookahead is not None:
             self._n_steps_lookahead = int(
@@ -141,6 +145,13 @@ class PianoWithShadowHands(base.PianoTask):
         self._discount: float = 1.0
 
     def _maybe_change_midi(self, random_state: np.random.RandomState) -> None:
+        
+        if self.callback is not None: 
+            midi = self.callback.get_midi()
+            self._initial_midi = midi 
+            self._midi = midi
+            self._reset_trajectory()
+
         if self._augmentations is not None:
             midi = self._initial_midi
             for var in self._augmentations:

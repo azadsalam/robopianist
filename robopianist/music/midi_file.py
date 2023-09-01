@@ -172,6 +172,11 @@ class MidiFile:
     # Factory methods.
 
     @classmethod
+    def from_note_seq(cls, seq) -> "MidiFile":
+        """Loads a MIDI file (either .mid or .proto) from disk."""
+        return cls(seq=seq)
+
+    @classmethod
     def from_file(cls, filename: Union[str, Path]) -> "MidiFile":
         """Loads a MIDI file (either .mid or .proto) from disk."""
         filename = Path(filename)

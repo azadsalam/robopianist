@@ -50,6 +50,7 @@ _ALL_DICT: Dict[str, Union[Path, str]] = {
 def load(
     environment_name: str,
     midi_file: Optional[Path] = None,
+    callback = None, 
     seed: Optional[int] = None,
     stretch: float = 1.0,
     shift: int = 0,
@@ -72,6 +73,9 @@ def load(
         legacy_step: Whether to use the legacy step function.
         task_kwargs: Additional keyword arguments to pass to the task.
     """
+
+    #if curriculum is not None: 
+    #    midi = None
     if midi_file is not None:
         midi = music.load(midi_file, stretch=stretch, shift=shift)
     else:
@@ -85,7 +89,7 @@ def load(
     task_kwargs = task_kwargs or {}
 
     return composer_utils.Environment(
-        task=piano_with_shadow_hands.PianoWithShadowHands(midi=midi, **task_kwargs),
+        task=piano_with_shadow_hands.PianoWithShadowHands(midi=midi, callback=callback, **task_kwargs),
         random_state=seed,
         strip_singleton_obs_buffer_dim=True,
         recompile_physics=recompile_physics,
