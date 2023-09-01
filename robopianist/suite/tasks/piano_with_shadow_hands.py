@@ -149,7 +149,7 @@ class PianoWithShadowHands(base.PianoTask):
     def _maybe_change_midi(self, random_state: np.random.RandomState) -> None:
         
         if self.callback is not None: 
-            midi = self.callback.get_midi()
+            midi = self.callback.get_midi().trim_silence()
             self._initial_midi = midi 
             self._midi = midi
             self._reset_trajectory()
