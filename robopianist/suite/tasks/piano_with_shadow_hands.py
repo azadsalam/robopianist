@@ -62,6 +62,7 @@ class PianoWithShadowHands(base.PianoTask):
         augmentations: Optional[Sequence[base_variation.Variation]] = None,
         energy_penalty_coef: float = _ENERGY_PENALTY_COEF,
         randomize_hand_positions: bool = False,
+        randomize_initial_time: bool = False,
         **kwargs,
     ) -> None:
         """Task constructor.
@@ -120,12 +121,18 @@ class PianoWithShadowHands(base.PianoTask):
         self._augmentations = augmentations
         self._energy_penalty_coef = energy_penalty_coef
         self._randomize_hand_positions = randomize_hand_positions
+        self._randomize_initial_time = randomize_initial_time
 
         if not disable_fingering_reward and not disable_colorization:
             self._colorize_fingertips()
         if disable_hand_collisions:
             self._disable_collisions_between_hands()
-        self._reset_quantities_at_episode_init()
+
+        # self._reset_quantities_at_episode_init()
+        self._t_idx: int = 0
+        self._should_terminate: bool = False
+        self._discount: float = 1.0
+
         self._reset_trajectory()  # Important: call before adding observables.
         self._add_observables()
         self._set_rewards()
@@ -142,9 +149,27 @@ class PianoWithShadowHands(base.PianoTask):
             self._reward_fn.add("forearm_reward", self._compute_forearm_reward)
 
     def _reset_quantities_at_episode_init(self) -> None:
-        self._t_idx: int = 0
-        self._should_terminate: bool = False
-        self._discount: float = 1.0
+        if self._randomize_initial_time:
+            self._t_idx = np.random.randint(
+                low=0, high=len(self._notes) - self._n_steps_lookahead
+            )
+        else:
+            self._t_idx = 0
+        self._rh_key_init: Optional[int] = None
+        self._lh_key_init: Optional[int] = None
+        for notes in self._notes[self._t_idx :]:
+            fingering = [note.fingering for note in notes]
+            fingering_keys = [note.key for note in notes]
+            for key, finger in zip(fingering_keys, fingering):
+                if finger < 5:
+                    self._rh_key_init = key
+                else:
+                    self._lh_key_init = key
+            #TODOZ: why both? understant the assymetry ..
+            if self._rh_key_init is not None and self._lh_key_init is not None:
+                break
+        self._should_terminate = False
+        self._discount = 1.0
 
     def _maybe_change_midi(self, random_state: np.random.RandomState) -> None:
         
@@ -460,7 +485,20 @@ class PianoWithShadowHands(base.PianoTask):
     ) -> None:
         """Randomize the initial position of the hands."""
         if not self._randomize_hand_positions:
-            return
-        offset = random_state.uniform(low=-_POSITION_OFFSET, high=_POSITION_OFFSET)
-        for hand in [self.right_hand, self.left_hand]:
-            hand.shift_pose(physics, (0, offset, 0))
+            # Place each hand near the first note it should play.
+            # TODOZ: understand range
+            for key, hand in zip(
+                [self._rh_key_init, self._lh_key_init],
+                [self.right_hand, self.left_hand],
+            ):
+                if key is not None:
+                    key_pos = physics.bind(self.piano.keys[key].geom[0]).xpos.copy()
+                    hand_pos = physics.bind(hand.root_body).xpos.copy()
+                    hand.shift_pose(physics, (0, key_pos[1] - hand_pos[1], 0))
+        else:
+            # Shift both hands by the same amount. This is a headache-free way to
+            # ensure the hands don't collide with each other and that the hands don't
+            # flip hemispheres.
+            offset = random_state.uniform(low=-_POSITION_OFFSET, high=_POSITION_OFFSET)
+            for hand in [self.right_hand, self.left_hand]:
+                hand.shift_pose(physics, (0, offset, 0))
